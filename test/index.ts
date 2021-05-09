@@ -6,6 +6,8 @@ chai.use(sinonChai)
 const assert = chai.assert
 import Promise from '../src/Promise'
 
+// promise A+ doc: https://juejin.cn/post/6844903649852784647
+
 describe('Promise', () => {
   it('是一个类', () => {
     // JS 中类就是函数
@@ -71,4 +73,152 @@ describe('Promise', () => {
       })
       promise.then(success)
     })
+
+  it('promise.then(fail) 里面的 fail' +
+    '会在 reject 执行的时候执行', done => {
+
+      const fail = sinon.fake()
+      const promise = new Promise((resolve, reject) => {
+        assert.isFalse(fail.called) // sucess 还没有调用
+        reject()
+        setTimeout(() => {
+          assert.isTrue(fail.called) // sucess 调用过了
+          done()
+        })
+      })
+      promise.then(null, fail)
+    })
+
+
+  it('2.2.1 如果 onFulfilled不是函数，必须忽略' +
+    '如果 onRejected不是函数，必须忽略', () => {
+      const promise = new Promise((resolve, reject) => {
+        reject()
+      })
+      promise.then(false, null)
+    })
+
+  it('2.2.2' +
+    'onFulfilled 必须在promise 完成(fulfilled)后被调用,并把 promise 的值作为它的第一个参数，' +
+    '此函数在promise完成(fulfilled)之前绝对不能被调用，' +
+    '此函数绝对不能被调用超过一次', done => {
+      const fulfilled = sinon.fake()
+      const promise = new Promise(resolve => {
+        // assert(promise.state === 'pending') // 先不测
+        assert.isFalse(fulfilled.called)
+        resolve('第一次')
+        resolve('第二次')
+        setTimeout(() => {
+          assert(promise.state === 'fulfilled')
+          assert.isTrue(fulfilled.calledOnce)
+          assert(fulfilled.calledWith('第一次'))
+          done()
+        })
+      })
+
+      promise.then(fulfilled)
+    })
+
+
+  it('2.2.3' +
+    'onRejected 必须在promise rejected 后被调用,并把 promise 的值作为它的第一个参数，' +
+    '此函数在promise rejected 之前绝对不能被调用，' +
+    '此函数绝对不能被调用超过一次', done => {
+      const rejected = sinon.fake()
+      const promise = new Promise((resolve, reject) => {
+        // assert(promise.state === 'pending') // 先不测
+        assert.isFalse(rejected.called)
+        reject('第一次')
+        reject('第二次')
+        setTimeout(() => {
+          assert(promise.state === 'rejected')
+          assert.isTrue(rejected.calledOnce)
+          assert(rejected.calledWith('第一次'))
+          done()
+        })
+      })
+
+      promise.then(null, rejected)
+    })
+
+  it('2.2.4 代码执行完之前不能调用 then 传的两个函数 成功的回调', done => {
+    const succced = sinon.fake()
+    const promise = new Promise(resolve => {
+      resolve()
+    })
+    promise.then(succced)
+    // 下面是之后的代码
+    assert.isFalse(succced.called)
+    setTimeout(() => {
+      assert.isTrue(succced.called)
+    })
+    done()
+  })
+
+  it('2.2.4 代码执行完之前不能调用 then 传的两个函数 失败的回调', done => {
+    const filled = sinon.fake()
+    const promise = new Promise((resolve, reject) => {
+      reject()
+    })
+    promise.then(null, filled)
+    // 下面是之后的代码
+    assert.isFalse(filled.called)
+    setTimeout(() => {
+      assert.isTrue(filled.called)
+    })
+    done()
+  })
+
+  it('2.2.5 onFulfilled 和 onRejected 必须被当做函数调用 不要有 this', done => {
+    const promise = new Promise(resolve => {
+      resolve()
+    })
+    promise.then(() => {
+      'use strict'
+      assert(this === undefined)
+      done()
+    })
+  })
+
+  it('2.2.6 then 可以在同一个 promise 调用多次, resovle', done => {
+    const promise = new Promise(resolve => {
+      resolve()
+    })
+
+    const callbacks = [sinon.fake(), sinon.fake(), sinon.fake()]
+    promise.then(callbacks[0])
+    promise.then(callbacks[1])
+    promise.then(callbacks[2])
+
+    setTimeout(() => {
+      assert(callbacks[0].called)
+      assert(callbacks[1].called)
+      assert(callbacks[2].called)
+      assert(callbacks[1].calledAfter(callbacks[0]))
+      assert(callbacks[2].calledAfter(callbacks[1]))
+      done()
+    })
+
+  })
+
+  it('2.2.6 then 可以在同一个 promise 调用多次, reject', done => {
+    const promise = new Promise((resolve, reject) => {
+      reject()
+    })
+
+    const callbacks = [sinon.fake(), sinon.fake(), sinon.fake()]
+    promise.then(null, callbacks[0])
+    promise.then(null, callbacks[1])
+    promise.then(null, callbacks[2])
+
+    setTimeout(() => {
+      assert(callbacks[0].called)
+      assert(callbacks[1].called)
+      assert(callbacks[2].called)
+      assert(callbacks[1].calledAfter(callbacks[0]))
+      assert(callbacks[2].calledAfter(callbacks[1]))
+      done()
+    })
+
+  })
 })
